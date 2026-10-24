@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MICADAS · AMS Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23f43f5e'/></svg>" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-text">
+          <h1>MICADAS <span class="thin">· Accelerator Mass Spectrometer</span> <span class="ver" id="appVer"></span></h1>
+          <p>How single atoms of <span class="c14">¹⁴C</span> are separated and counted for radiocarbon dating</p>
+        </div>
+      </div>
+      <div class="seg view-tabs" id="viewTabs" title="Switch between the beamline and the inside of the ion source">
+        <button data-view="beam" class="active">Beamline</button>
+        <button data-view="source">Ion source</button>
+      </div>
+      <div class="topbar-actions">
+        <div class="seg" id="speedSeg" title="Animation speed">
+          <button data-speed="0.5">½×</button>
+          <button data-speed="1" class="active">1×</button>
+          <button data-speed="2">2×</button>
+          <button data-speed="4">4×</button>
+        </div>
+        <button class="btn icon-btn" id="btnPause" title="Pause / resume (Space)">
+          <svg id="iconPause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
+          <svg id="iconPlay" viewBox="0 0 24 24" style="display:none"><path d="M8 5.5v13l11-6.5z"/></svg>
+        </button>
+        <button class="btn" id="btnAbout">How it works</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <!-- ───────────── Left: machine controls ───────────── -->
+      <aside class="panel side" id="controlPanel">
+        <div id="beamControls">
+          <div class="panel-head">
+            <h2>Machine controls</h2>
+            <button class="btn small accent" id="btnTune" title="Set every parameter to its design value">⚡ Tune to optimum</button>
+          </div>
+          <div id="sliders"><!-- built from /api/config --></div>
+
+          <div class="ctl-group">
+            <div class="group-title">Sequential injection</div>
+            <label class="switch-row" id="bouncerRow">
+              <div>
+                <div class="switch-label">Bouncer</div>
+                <div class="switch-hint">Lets ¹²C and ¹³C take the mass-14 corner in fast pulses</div>
+              </div>
+              <span class="switch"><input type="checkbox" id="bouncerToggle" autocomplete="off" checked /><i></i></span>
+            </label>
+          </div>
+        </div>
+
+        <div id="sourceControls" hidden>
+          <div class="panel-head">
+            <h2>Source controls</h2>
+            <button class="btn small accent" id="btnTuneSource" title="Set every source parameter to its design value">⚡ Tune to optimum</button>
+          </div>
+          <div id="sourceSliders"><!-- built from /api/source-config --></div>
+          <div class="ctl-group">
+            <div class="group-title">Target material</div>
+            <div class="seg seg-wide" id="materialSeg"></div>
+          </div>
+          <div class="ctl-group">
+            <div class="group-title">Beam formation</div>
+            <label class="switch-row">
+              <div>
+                <div class="switch-label">Immersion lens</div>
+                <div class="switch-hint">Shield electrode at the target that forms the fresh C⁻ plume into a beam — switch off to see its effect</div>
+              </div>
+              <span class="switch"><input type="checkbox" id="lensToggle" autocomplete="off" checked /><i></i></span>
+            </label>
+          </div>
+          <div class="ctl-group">
+            <div class="group-title">Visual aids</div>
+            <label class="switch-row">
+              <div>
+                <div class="switch-label">Electric field</div>
+                <div class="switch-hint">Equipotential lines — each line is one voltage step; where they crowd, the force on the ions is strongest</div>
+              </div>
+              <span class="switch"><input type="checkbox" id="fieldToggle" autocomplete="off" checked /><i></i></span>
+            </label>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ───────────── Center: the machine ───────────── -->
+      <section class="stage-wrap" id="stageWrapSource" hidden>
+        <div class="stage" id="stageSource">
+          <canvas id="cvSrcStatic"></canvas>
+          <canvas id="cvSrcTrails"></canvas>
+          <canvas id="cvSrcSprites"></canvas>
+          <div class="stage-hint">hover over a component to learn what it does</div>
+          <div class="paused-badge" id="pausedBadgeSource">paused</div>
+        </div>
+        <div class="infocard">
+          <div class="infocard-title" id="infoTitleSrc">Inside the Cs sputter ion source</div>
+          <div class="infocard-body" id="infoBodySrc">
+            Caesium vapour sprayed onto the glowing ionizer leaves as Cs⁺,
+            which the spherical ionizer focuses through the lens aperture
+            onto the sample (10 keV). Every impact blasts atoms out of the
+            graphite — many pick up an extra electron and leave as negative
+            ions: focused by the immersion lens, out through the ionizer
+            hole, trimmed by the extractor, accelerated to 40 keV in the
+            extraction gap, aimed by the steerer and focused by the box lens
+            onto the object point of the LE magnet. Potentials as run on the
+            CEZA MICADAS. Hover over any component for details.
+          </div>
+        </div>
+      </section>
+
+      <section class="stage-wrap" id="stageWrapBeam">
+        <div class="stage" id="stage">
+          <canvas id="cvStatic"></canvas>
+          <canvas id="cvTrails"></canvas>
+          <canvas id="cvSprites"></canvas>
+          <div class="stage-hint" id="stageHint">hover over a component to learn what it does</div>
+          <div class="paused-badge" id="pausedBadge">paused</div>
+        </div>
+        <div class="infocard" id="infoCard">
+          <div class="infocard-title" id="infoTitle">Welcome to MICADAS</div>
+          <div class="infocard-body" id="infoBody">
+            This is a working model of a real radiocarbon-dating machine.
+            Negative carbon ions race from the ion source (top left) through
+            two magnets, a 200&thinsp;kV accelerator and an energy filter to the
+            detector. Hover over any component — or detune a slider and watch
+            where the beam ends up.
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────────── Right: beams & measurements ───────────── -->
+      <aside class="panel side right">
+        <div id="sourcePanelRight" hidden>
+          <div class="panel-head"><h2>Inside the source</h2></div>
+          <div class="legend">
+            <div class="legend-title">What you are seeing</div>
+            <div class="legend-row"><span class="dot" style="--c:#fde68a"></span><span><b>Cs vapour</b> — neutral caesium, sprayed from the ring nozzle onto the hot ionizer surface.</span></div>
+            <div class="legend-row"><span class="dot" style="--c:#fcd34d"></span><span><b>Cs⁺ ions</b> — born on the ionizer surface, accelerated and focused onto the sample by the cathode potential.</span></div>
+            <div class="legend-row"><span class="dot" style="--c:#fbbf24"></span><span><b>Negative ions</b> — C⁻ (amber), CH⁻/CH₂⁻ (violet/pink) and O⁻ (cyan) sputtered off the target, accelerated out to the right.</span></div>
+            <div class="legend-row"><span class="dot" style="--c:#64748b"></span><span><b>Sputtered neutrals</b> — uncharged debris; no field collects it, it just coats the source.</span></div>
+            <div class="legend-row"><span class="dot" style="--c:#e2e8f0"></span><span><b>Electrons</b> — leave the cathode with the anions and are accelerated the same way; the suppressor magnets at the extractor throw them out while they are still slow.</span></div>
+            <div class="legend-row"><span class="dot" style="--c:#7dd3fc"></span><span><b>Equipotential lines</b> (dashed) — the electric landscape, from −40 kV at the cathode to 0 V at the exit. One and the same field pulls Cs⁺ towards the sample and the negative ions out of it.</span></div>
+          </div>
+
+          <div class="panel-head measurements-head"><h2>Source output</h2></div>
+          <div class="meas">
+            <div class="meas-top"><span class="dot" style="--c:#fcd34d"></span><span class="meas-name">Cs⁺ on target</span><span class="meas-val" id="valSrcCs">0 µA</span></div>
+            <div class="bar"><i id="barSrcCs" style="--c:#fcd34d"></i></div>
+          </div>
+          <div class="meas">
+            <div class="meas-top"><span class="dot" style="--c:#fbbf24"></span><span class="meas-name">C⁻ to beamline</span><span class="meas-val" id="valSrcC">0.0 µA</span></div>
+            <div class="bar"><i id="barSrcC" style="--c:#fbbf24"></i></div>
+          </div>
+          <div class="meas">
+            <div class="meas-top"><span class="dot" style="--c:#22d3ee"></span><span class="meas-name">O⁻ to beamline</span><span class="meas-val" id="valSrcO">0.0 µA</span></div>
+            <div class="bar"><i id="barSrcO" style="--c:#22d3ee"></i></div>
+          </div>
+          <div class="age-card" title="Cathode + source potential — the kinetic energy of the extracted anions">
+            <div class="age-label">Extraction energy</div>
+            <div class="age-val" id="valSrcEnergy">40.0 keV</div>
+            <div class="age-sub" id="srcEnergyHint">matches the 40 keV the beamline is tuned for</div>
+          </div>
+          <div class="meas-grid">
+            <div class="kpi"><div class="kpi-val" id="valSrcLost">0</div><div class="kpi-name">ions lost in the source</div></div>
+          </div>
+        </div>
+
+        <div id="beamPanelRight">
+        <div class="panel-head"><h2>Ion beams</h2></div>
+        <div id="speciesChips"><!-- built from /api/config --></div>
+
+        <div class="legend">
+          <div class="legend-title">Also flying around</div>
+          <div class="legend-row"><span class="dot" style="--c:#64748b"></span><span><b>Neutralized atoms</b> — sometimes the He stripper takes <em>all</em> the charge. No field can steer a neutral atom: it flies dead straight (drawn in true geometry, without the sideways stretch used for the beams) and hits the outer wall of the HE magnet.</span></div>
+          <div class="legend-row"><span class="dot" style="--c:#7dd3fc"></span><span><b>Protons</b> — debris of smashed hydride molecules; far too light, they dive into the inner wall.</span></div>
+          <div class="legend-row"><span class="dot dot-duo"></span><span><b>Carbon fragments</b> — pale-coloured pieces of broken molecules carrying too little energy; collected by the ¹³CH monitor cup or scraped off at the slits.</span></div>
+        </div>
+
+        <div class="abundance-note">
+          In a real sample: 98.9&thinsp;% ¹²C, 1.1&thinsp;% ¹³C and only
+          ~1 atom of ¹⁴C per 10¹² carbon atoms. The animation shows
+          comparable beam intensities so every species stays visible —
+          the measurement panel below, however, converts the simulated
+          rates into realistic machine readings.
+        </div>
+
+        <div class="panel-head measurements-head"><h2>Sample in the ion source</h2></div>
+        <select id="sampleSelect" class="sample-select"
+                title="Age of the (simulated) sample — scales how much ¹⁴C is left"></select>
+
+        <div class="panel-head measurements-head"><h2>Measurements</h2></div>
+        <div id="measurements">
+          <div class="meas" id="measCup12">
+            <div class="meas-top"><span class="dot" style="--c:#fbbf24"></span><span class="meas-name">¹²C Faraday cup</span><span class="meas-val" id="valCup12">0.0 /s</span></div>
+            <div class="bar"><i id="barCup12" style="--c:#fbbf24"></i></div>
+          </div>
+          <div class="meas" id="measCup13">
+            <div class="meas-top"><span class="dot" style="--c:#34d399"></span><span class="meas-name">¹³C Faraday cup</span><span class="meas-val" id="valCup13">0.0 /s</span></div>
+            <div class="bar"><i id="barCup13" style="--c:#34d399"></i></div>
+          </div>
+          <div class="meas" id="measCupCH" title="Catches the ¹³C fragments of broken-up ¹³CH — a live measure of how much hydride is injected with the mass-14 beam">
+            <div class="meas-top"><span class="dot" style="--c:#a78bfa"></span><span class="meas-name">¹³CH monitor cup</span><span class="meas-val" id="valCupCH">0.0 /s</span></div>
+            <div class="bar"><i id="barCupCH" style="--c:#a78bfa"></i></div>
+          </div>
+          <div class="meas" id="measDet">
+            <div class="meas-top"><span class="dot" style="--c:#f43f5e"></span><span class="meas-name">¹⁴C detector</span><span class="meas-val" id="valDet">0.0 /s</span></div>
+            <div class="bar"><i id="barDet" style="--c:#f43f5e"></i></div>
+          </div>
+          <div class="meas-grid">
+            <div class="kpi"><div class="kpi-val" id="valDetTotal">0</div><div class="kpi-name">¹⁴C atoms counted</div></div>
+            <div class="kpi"><div class="kpi-val" id="valTrans">–</div><div class="kpi-name">¹⁴C transmission</div></div>
+            <div class="kpi warn"><div class="kpi-val" id="valBg">0</div><div class="kpi-name">background events</div></div>
+            <div class="kpi warn" title="k × ¹³CH-monitor counts — the molecular background the monitor cup predicts for the detector. Compare with the actual background events."><div class="kpi-val" id="valBgEst">0.0</div><div class="kpi-name">predicted mol. bg</div></div>
+            <div class="kpi"><div class="kpi-val" id="valLost">0</div><div class="kpi-name">ions lost on walls</div></div>
+          </div>
+          <div class="age-card" title="Computed from the measured ¹⁴C/¹²C ratio via the 5730-year half-life">
+            <div class="age-label">Radiocarbon age</div>
+            <div class="age-val" id="valAge">—</div>
+            <div class="age-sub" id="valRatio">¹⁴C/¹²C = —</div>
+          </div>
+        </div>
+        </div><!-- /beamPanelRight -->
+      </aside>
+    </main>
+
+    <!-- ───────────── About modal ───────────── -->
+    <div class="modal-backdrop" id="aboutModal" hidden>
+      <div class="modal">
+        <button class="modal-close" id="btnCloseAbout">✕</button>
+        <h2>How accelerator mass spectrometry works</h2>
+        <div class="modal-body">
+          <p><strong>The problem.</strong> Every living thing constantly takes up carbon —
+          including a radioactive trace of <b class="c14">¹⁴C</b> made by cosmic rays. When an organism
+          dies, the intake stops and the ¹⁴C slowly decays with a half-life of 5730 years.
+          Measure how much is left, and you know how long ago it died. The catch: in a modern
+          sample only <b>one in a trillion</b> carbon atoms is ¹⁴C. Waiting for decays takes
+          grams of material and weeks of counting — AMS instead <em>counts the atoms directly</em>,
+          from less than a milligram, in under an hour.</p>
+
+          <p><strong>The impostors.</strong> Picking one atom in 10¹² means defeating lookalikes:
+          <b>¹⁴N</b> (same mass, a million times more abundant) and molecules like
+          <b style="color:#a78bfa">¹³CH</b> and <b style="color:#f472b6">¹²CH₂</b> that weigh
+          almost exactly 14 u. AMS beats them in three moves:</p>
+          <ol>
+            <li><b>Negative ions.</b> The caesium sputter source only emits negative ions —
+            and nitrogen cannot form a stable one. ¹⁴N is out before the race begins.</li>
+            <li><b>The stripper.</b> Inside the 200 kV tandem accelerator the ions fly through
+            helium gas that strips electrons off, flipping them to positive (1+). Molecules cannot
+            survive losing these electrons — they are torn apart. Their fragments have the wrong
+            momentum and energy and are swept aside by the HE magnet and the ESA.</li>
+            <li><b>Triple filtering.</b> A magnet sorts by mass before the accelerator, a second
+            magnet sorts by momentum after it, and the electrostatic analyzer checks the energy.
+            Only true 440 keV ¹⁴C(1+) survives all three and reaches the detector.</li>
+          </ol>
+
+          <p><strong>The measurement.</strong> The stable beams ¹²C⁺ and ¹³C⁺ are measured as
+          electric currents in Faraday cups, while ¹⁴C is counted atom by atom in a gas
+          ionization detector. The ¹⁴C/¹²C ratio — compared against standards — gives the
+          radiocarbon age.</p>
+
+          <p><strong>Watching the impostors: the ¹³CH monitor cup.</strong> A tiny fraction of the
+          molecules survives the stripper intact — and a surviving
+          <b style="color:#a78bfa">¹³CH⁺</b> is indistinguishable from ¹⁴C to every filter in the
+          machine: same mass (to 0.06&thinsp;%), same momentum, same energy. It cannot be caught
+          directly; it becomes background in the detector. The trick is to count its broken-up
+          siblings instead. Nearly all ¹³CH molecules <em>are</em> torn apart in the stripper, and
+          their ¹³C fragments leave the proton's share of the energy behind — with only 13/14 of
+          the full energy they take a visibly tighter curve through the HE magnet and land on their
+          own unique spot, right between the ¹²C and the ¹³C cup. A third Faraday cup parked there
+          measures this fragment current: a live gauge of how much hydride is riding along with the
+          mass-14 beam, sample by sample. And since the surviving fraction is a fixed property of
+          the stripper, that current — multiplied by a constant calibrated with ¹⁴C-free blank
+          material — <em>predicts</em> the molecular background in the detector. In the measurement
+          panel you can watch the prediction ("predicted mol. bg") track the actual background
+          events. In a real lab this monitor also flags hydrogen-rich, poorly prepared samples the
+          moment they are sputtered.</p>
+
+          <p><strong>This machine.</strong> MICADAS (<em>MIni CArbon DAting System</em>) was developed
+          at ETH Zurich (Synal, Stocker &amp; Suter, 2007) and is built by Ionplus AG. It is the most
+          compact ¹⁴C-AMS in the world (≈3.2 × 2.6 m): a vacuum-insulated 200 kV tandem, helium
+          stripping, 90° magnets, and a 90° ESA (r = 380 mm, ±40 kV) in front of the detector —
+          exactly the layout and the numbers used in this simulation.</p>
+
+          <p class="modal-foot">Simulation notes: trajectories use first-order beam optics around the
+          reference path; transverse offsets are exaggerated ~3× for visibility — except neutral
+          atoms, which are drawn on their geometrically true straight line; beam intensities and
+          molecular survival are stylised so that rare events remain visible.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "micadas",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "exec ./.venv/bin/python -m uvicorn server.main:app --host 127.0.0.1 --port ${PORT:-8551} --log-config server/log_config.json"],
+      "autoPort": true
+    }
+  ]
+}

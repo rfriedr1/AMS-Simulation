@@ -1,0 +1,15 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# macOS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# local Claude Code permission settings (machine-specific)
+.claude/settings.local.json
+
+# logs
+*.log
