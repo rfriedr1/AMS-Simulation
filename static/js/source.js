@@ -670,7 +670,7 @@ export class SourceView {
     ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     const lbl = (t, x, y) => { const p = this.s2c(x, y); ctx.fillText(t, p[0], p[1]); };
     lbl(`−${(S.cathodeKV + S.srcKV).toFixed(0)} kV`, tx - 4, G.cathode.half + 26);
-    lbl(`−${S.srcKV.toFixed(0)} kV`, tx + G.R + 10, G.R + 26);
+    lbl(`−${S.srcKV.toFixed(0)} kV`, tx + G.R * 0.8, -G.R - 28);
     lbl(`−${(S.srcKV + S.extrOffsetKV).toFixed(1)} kV`, G.extr.x + 8, 56);
     lbl("0 kV", G.gnd.x + 4, G.wallY + 16);
     lbl(`−${S.boxLensKV.toFixed(0)} kV`, G.box.x[1], G.box.half + 14);

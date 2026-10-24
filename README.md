@@ -9,6 +9,10 @@ a time. (¹²CH rides in the bouncer's mass-13 slot: its ¹²C fragment misses t
 ¹²C cup by a few mm, while a rare intact survivor has almost exactly the
 rigidity of real ¹³C — the classic interference on the stable-isotope cups.)
 
+![Beamline view: ion source, injection magnet, 200 kV tandem, HE magnet with Faraday cups, ESA and detector](docs/beamline.jpg)
+
+![Ion source view: Cs sputter source cutaway with potentials, steerer and box lens](docs/ion-source.jpg)
+
 ## Quick start
 
 ```bash
