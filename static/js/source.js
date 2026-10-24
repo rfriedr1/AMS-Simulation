@@ -312,6 +312,7 @@ export class SourceView {
           }
         }
         if (p.x < G.cathode.x0 || p.x > G.bounds.x1 - 8 || Math.abs(p.y) > 100 || d < G.spotR) p.dead = true;
+        else if (this.hitsSolid(p.x, p.y)) p.dead = true;      // condenses on whatever it hits
       }
 
       else if (p.type === "cs+") {
@@ -332,10 +333,11 @@ export class SourceView {
 
       else if (p.type === "sput0") {
         p.x += p.vx * dt; p.y += p.vy * dt;
-        const d = Math.hypot(p.x - tx, p.y - ty);
-        if ((p.x > G.plate.x0 && p.x < G.plate.x1 + 1 && Math.abs(p.y) > G.plate.ap) ||
-            (d > G.R - 2 && Math.abs(Math.atan2(p.y - ty, p.x - tx)) / DEG > G.holeDeg) ||
-            Math.abs(p.y) > G.wallY + 30 || p.x > G.objX) p.dead = true;
+        // neutral: no field acts on it, but it sticks to the first solid it meets
+        if (this.hitsSolid(p.x, p.y) || Math.abs(p.y) > G.wallY + 30 || p.x > G.objX + 8) {
+          p.dead = true;
+          if (p.x < G.objX) this.events.push({ type: "spark", x: p.x, y: p.y, color: p.color, t: 0, small: true });
+        }
       }
 
       else if (p.type === "anion" || p.type === "e") {
@@ -425,12 +427,39 @@ export class SourceView {
           continue;
         }
         if (Math.abs(p.y) > (p.zone >= 2 ? G.wallY : 100)) { this.kill(p, isE); continue; }
+        if (this.hitsSolid(p.x, p.y)) { this.kill(p, isE); continue; }   // safety net between zone planes
         void x0;
       }
     }
     this.particles = this.particles.filter((p) => !p.dead);
     for (const ev of this.events) ev.t += dt;
     this.events = this.events.filter((ev) => ev.t < 0.8);
+  }
+
+  /** True if (x, y) lies inside a solid part: electrodes, plates, walls.
+   *  Nothing — charged or not — passes through these. */
+  hitsSolid(x, y) {
+    const [tx, ty] = G.target;
+    const ay = Math.abs(y - ty);
+    if (x >= G.cathode.x0 && x <= G.cathode.x1 && ay <= G.cathode.half) return true;
+    if (this.lensOn && x >= G.plate.x0 && x <= G.plate.x1 && ay > G.plate.ap) return true;
+    const d = Math.hypot(x - tx, y - ty);
+    if (d > G.R - 2.5 && d < G.R + 2.5) {                       // ionizer cap
+      const ang = Math.abs(Math.atan2(y - ty, x - tx)) / DEG;
+      if (ang > G.holeDeg && ang < G.spanDeg + 6) return true;
+    }
+    if (x >= tx + G.R - 1 && x <= G.extr.x && ay > G.channelHalf) return true;   // shroud / channel
+    if (x >= G.extr.x && x <= G.extr.x + G.extr.w && ay > G.extr.ap) return true;
+    if (Math.abs(x - G.magnetX) <= 3 && ay >= 13 && ay <= 19) return true;        // suppressor magnets
+    if (x >= G.gnd.x && x <= G.gnd.x + G.gnd.w && ay > G.gnd.ap) return true;
+    if (x >= G.steer.x0 && x <= G.steer.x1 && ay >= G.steer.gap && ay <= G.steer.gap + 3) return true;
+    for (let i = 0; i < 3; i++) {
+      const bx = G.box.x[i], hw = G.box.w[i] / 2;
+      if (x >= bx - hw && x <= bx + hw && ay >= G.box.ap && ay <= G.box.half) return true;
+    }
+    if (Math.abs(x - G.objX) <= 1.5 && ay >= G.objAp && ay <= 12) return true;   // object-point jaws
+    if (x >= G.extr.x - 2 && ay >= G.wallY) return true;                          // chamber walls
+    return false;
   }
 
   kill(p, quiet = false) {
